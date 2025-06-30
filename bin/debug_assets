@@ -1,0 +1,42 @@
+#!/bin/bash
+set -e
+
+echo "=== Asset Compilation Debug Script ==="
+echo "Environment: $RAILS_ENV"
+echo "Node version: $(node --version)"
+echo "Yarn version: $(yarn --version)"
+echo "Ruby version: $(ruby --version)"
+echo "Bundle version: $(bundle --version)"
+
+echo ""
+echo "=== Environment Variables ==="
+echo "NODE_OPTIONS: $NODE_OPTIONS"
+echo "RAILS_LOG_TO_STDOUT: $RAILS_LOG_TO_STDOUT"
+echo "RAILS_SERVE_STATIC_FILES: $RAILS_SERVE_STATIC_FILES"
+echo "SECRET_KEY_BASE set: ${SECRET_KEY_BASE:+YES}"
+
+echo ""
+echo "=== Checking directories ==="
+ls -la tmp/cache/ || echo "tmp/cache does not exist"
+ls -la public/ || echo "public does not exist"
+
+echo ""
+echo "=== Checking webpacker status ==="
+bundle exec rake webpacker:verify_install || echo "Webpacker verification failed"
+
+echo ""
+echo "=== Checking for JavaScript syntax errors ==="
+for file in app/javascript/packs/*.js; do
+  echo "Checking $file..."
+  node -c "$file" || echo "Syntax error in $file"
+done
+
+echo ""
+echo "=== Running asset precompilation with verbose output ==="
+SECRET_KEY_BASE=precompile_placeholder \
+RAILS_LOG_TO_STDOUT=enabled \
+RAILS_SERVE_STATIC_FILES=true \
+DISABLE_SPRING=1 \
+SKIP_STORAGE_VALIDATION=true \
+NODE_ENV=production \
+bundle exec rake assets:precompile --trace 
