@@ -13,10 +13,17 @@ ENV RAILS_SERVE_STATIC_FILES=${RAILS_SERVE_STATIC_FILES}
 ARG RAILS_ENV=production
 ENV RAILS_ENV=${RAILS_ENV}
 
-ARG NODE_OPTIONS="--openssl-legacy-provider"
+# Increase Node.js memory limit and add legacy provider
+ARG NODE_OPTIONS="--openssl-legacy-provider --max-old-space-size=4096"
 ENV NODE_OPTIONS=${NODE_OPTIONS}
 
 ENV BUNDLE_PATH="/gems"
+
+# Add additional environment variables for asset compilation
+ENV RAILS_LOG_TO_STDOUT=enabled
+ENV DISABLE_SPRING=1
+ENV RAILS_SERVE_STATIC_FILES=true
+ENV SKIP_STORAGE_VALIDATION=true
 
 RUN apk update && apk add --no-cache \
   openssl \
@@ -63,14 +70,21 @@ COPY . /app
 # https://github.com/chatwoot/chatwoot/issues/701
 RUN mkdir -p /app/log
 
+# Create tmp directories for webpacker
+RUN mkdir -p /app/tmp/cache/webpacker
+RUN mkdir -p /app/public/packs
+
 # generate production assets if production environment
 RUN if [ "$RAILS_ENV" = "production" ]; then \
-  SECRET_KEY_BASE=precompile_placeholder RAILS_LOG_TO_STDOUT=enabled bundle exec rake assets:precompile \
+  echo "Starting asset precompilation with enhanced error handling..." && \
+  SECRET_KEY_BASE=precompile_placeholder \
+  bundle exec rake docker:assets_precompile \
+  && echo "Asset precompilation completed successfully" \
   && rm -rf spec node_modules tmp/cache; \
   fi
 
 # Generate .git_sha file with current commit hash
-RUN git rev-parse HEAD > /app/.git_sha
+RUN git rev-parse HEAD > /app/.git_sha 2>/dev/null || echo "unknown" > /app/.git_sha
 
 # Remove build dependencies
 RUN apk del --no-cache build-base musl ruby-dev gcc musl-dev openssl-dev g++ linux-headers xz \
